@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ระบบคลังปืน M16A1</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; background: #f5f5f5; }
+    input, button { margin: 5px; padding: 10px; font-size: 16px; }
+    #log, #inventory, #actions { background: #fff; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 0 5px rgba(0,0,0,0.1); }
+    h1, h2 { color: #2c3e50; }
+    img.logo { display: block; margin: 0 auto 20px; height: 100px; }
+    ul { padding-left: 20px; }
+  </style>
+</head>
+<body>
+
+<img src="C:\เดสก์ท็อป\นจอ\ATTS Project\logo_rtafa.png" width="300"  height= "300" class="logo">
+
+<h1>ระบบคลังปืน M16A1</h1>
+
+<section id="login">
+  <h2>ลงทะเบียนผู้เบิก</h2>
+  <input type="text" id="username" placeholder="ชื่อผู้เบิก">
+  <button onclick="register()">ลงทะเบียน</button>
+</section>
+
+<section id="inventory">
+  <h2>คลังปืน</h2>
+  <ul id="stockList"></ul>
+</section>
+
+<section id="actions">
+  <h2>เบิก / คืนปืน</h2>
+
+  <input type="text" id="serialInput" placeholder="ยิงบาร์โค้ดที่นี่ หรือกรอกซีเรียล" autofocus>
+  <button onclick="checkout()">เบิกปืน</button>
+  <button onclick="checkin()">คืนปืน</button>
+</section>
+
+<section id="log">
+  <h2>ประวัติการเบิก-คืน</h2>
+  <ul id="historyList"></ul>
+</section>
+
+<script>
+let username = "";
+let inventory = [];
+let history = [];
+
+// โหลดข้อมูลจาก localStorage
+function loadData() {
+  const storedInventory = localStorage.getItem("inventory");
+  const storedHistory = localStorage.getItem("history");
+  const storedUser = localStorage.getItem("username");
+
+  if (storedInventory) {
+    inventory = JSON.parse(storedInventory);
+  } else {
+    for (let i = 1; i <= 10; i++) {
+      let serial = "M16A1-" + String(i).padStart(3, '0');
+      inventory.push({ name: "ปืน M16A1", serial: serial, quantity: 1 });
+    }
+  }
+
+  if (storedHistory) history = JSON.parse(storedHistory);
+  if (storedUser) {
+    username = storedUser;
+    document.getElementById("username").value = username;
+  }
+}
+
+// บันทึกข้อมูล
+function saveData() {
+  localStorage.setItem("inventory", JSON.stringify(inventory));
+  localStorage.setItem("history", JSON.stringify(history));
+  localStorage.setItem("username", username);
+}
+
+function register() {
+  username = document.getElementById('username').value.trim();
+  if (username) {
+    alert('ลงทะเบียนสำเร็จ: ' + username);
+    saveData();
+  } else {
+    alert('กรุณากรอกชื่อผู้เบิก');
+  }
+}
+
+function displayInventory() {
+  const stockList = document.getElementById('stockList');
+  stockList.innerHTML = '';
+  inventory.forEach(item => {
+    let li = document.createElement('li');
+    li.textContent = `${item.name} (SN: ${item.serial}) - ${item.quantity > 0 ? 'พร้อมใช้งาน' : 'ถูกเบิกแล้ว'}`;
+    stockList.appendChild(li);
+  });
+}
+
+function displayHistory() {
+  const historyList = document.getElementById('historyList');
+  historyList.innerHTML = '';
+  history.forEach(log => {
+    let li = document.createElement('li');
+    li.textContent = `[${log.time}] ${log.user} ${log.action} ${log.item} (SN: ${log.serial})`;
+    historyList.appendChild(li);
+  });
+}
+
+function checkout() {
+  let serial = document.getElementById('serialInput').value.trim();
+  if (!username) {
+    alert('กรุณาลงทะเบียนก่อนเบิกปืน');
+    return;
+  }
+  let item = inventory.find(i => i.serial === serial);
+  if (item && item.quantity > 0) {
+    item.quantity = 0;
+    history.push({ action: 'เบิก', item: item.name, serial: item.serial, user: username, time: new Date().toLocaleString() });
+    saveData();
+    displayInventory();
+    displayHistory();
+    alert('เบิกสำเร็จ');
+  } else {
+    alert('ไม่พบปืน หรือปืนนี้ถูกเบิกแล้ว');
+  }
+}
+
+function checkin() {
+  let serial = document.getElementById('serialInput').value.trim();
+  let item = inventory.find(i => i.serial === serial);
+  if (item && item.quantity === 0) {
+    item.quantity = 1;
+    history.push({ action: 'คืน', item: item.name, serial: item.serial, user: username, time: new Date().toLocaleString() });
+    saveData();
+    displayInventory();
+    displayHistory();
+    alert('คืนสำเร็จ');
+  } else {
+    alert('ไม่พบปืน หรือปืนนี้ยังไม่ได้เบิก');
+  }
+}
+
+// กด Enter เพื่อเบิก/คืนอัตโนมัติ (รองรับเครื่องยิงบาร์โค้ด)
+document.getElementById("serialInput").addEventListener("keydown", function (e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    let serial = this.value.trim();
+    let item = inventory.find(i => i.serial === serial);
+    if (item && item.quantity > 0) {
+      checkout();
+    } else if (item && item.quantity === 0) {
+      checkin();
+    } else {
+      alert("ไม่พบหมายเลขซีเรียลในคลัง");
+    }
+    this.value = "";
+  }
+});
+
+// เรียกใช้งานตอนโหลดหน้าเว็บ
+loadData();
+displayInventory();
+displayHistory();
+</script>
+
+</body>
+</html>
